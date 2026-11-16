@@ -1,0 +1,87 @@
+name: Build patched NetBird proxy
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 12 * * *"
+      timezone: "Europe/Amsterdam"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v7
+        with:
+          path: patches
+
+      - name: Checkout NetBird
+        uses: actions/checkout@v7
+        with:
+          repository: netbirdio/netbird
+          ref: main
+          path: netbird
+
+      - name: Check whether NetBird changed
+        id: upstream
+        working-directory: netbird
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          current=$(git rev-parse HEAD)
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Manual run, building regardless of saved SHA."
+          else
+            previous=$(cat ../patches/netbird-sha.txt 2>/dev/null || true)
+            if [ "$current" = "$previous" ]; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+              echo "NetBird has not changed; skipping build."
+            else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+              echo "NetBird changed: $previous -> $current"
+            fi
+          fi
+
+      - name: Apply patch
+        if: steps.upstream.outputs.changed == 'true'
+        working-directory: netbird
+        run: |
+          git apply --check ../patches/preflight-proxy.patch
+          git apply ../patches/preflight-proxy.patch
+
+      - name: Log in to GHCR
+        if: steps.upstream.outputs.changed == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        if: steps.upstream.outputs.changed == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: ./netbird
+          file: ./netbird/proxy/Dockerfile.multistage
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/netbird-proxy-preflight-patch:latest
+
+      - name: Save published NetBird SHA
+        if: steps.upstream.outputs.changed == 'true'
+        working-directory: patches
+        env:
+          NETBIRD_SHA: ${{ steps.upstream.outputs.current }}
+        run: |
+          echo "$NETBIRD_SHA" > netbird-sha.txt
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add netbird-sha.txt
+          git commit -m "Record published NetBird revision $NETBIRD_SHA"
+          git push

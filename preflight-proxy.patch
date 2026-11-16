@@ -1,0 +1,19 @@
+diff --git a/proxy/internal/auth/middleware.go b/proxy/internal/auth/middleware.go
+index 7b12d82c..5f1fe98f 100644
+--- a/proxy/internal/auth/middleware.go
++++ b/proxy/internal/auth/middleware.go
+@@ -601,6 +601,14 @@ func (mw *Middleware) forwardWithHeaderAuth(w http.ResponseWriter, r *http.Reque
+ 			continue
+ 		}
+ 
++		// Always forward CORS preflight requests.
++		if r.Method == http.MethodOptions &&
++			r.Header.Get("Origin") != "" &&
++			r.Header.Get("Access-Control-Request-Method") != "" {
++			next.ServeHTTP(w, r)
++			return true
++		}
++
+ 		present, matched, unusable := hdr.Verify(r)
+ 		if matched {
+ 			if cd := proxy.CapturedDataFromContext(r.Context()); cd != nil {
