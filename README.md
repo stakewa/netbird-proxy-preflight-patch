@@ -9,13 +9,13 @@ The patch forwards CORS preflight requests (`OPTIONS` requests containing both a
 ## Container image
 
 ```text
-ghcr.io/StaKeWa/netbird-proxy-preflight-patch:latest
+ghcr.io/stakewa/netbird-proxy-preflight-patch:latest
 ```
 
 Pull it with:
 
 ```bash
-docker pull ghcr.io/StaKeWa/netbird-proxy-preflight-patch:latest
+docker pull ghcr.io/stakewa/netbird-proxy-preflight-patch:latest
 ```
 
 Use this image in place of the standard NetBird proxy image in your deployment configuration.
@@ -25,7 +25,7 @@ In your Compose file, keep your existing `proxy` service settings and replace it
 
 ```yaml
   proxy:
-    image: ghcr.io/StaKeWa/netbird-proxy-preflight-patch:latest
+    image: ghcr.io/stakewa/netbird-proxy-preflight-patch:latest
     container_name: netbird-proxy
     ports:
       - 51820:51820/udp
